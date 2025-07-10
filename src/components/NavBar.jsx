@@ -2,14 +2,16 @@ import { Box, Button, Typography } from "@mui/material";
 import CodeIcon from '@mui/icons-material/Code';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from "../context/AuthContext";
-import { Logout } from "@mui/icons-material";
+import { v4 as uuidv4 } from "uuid"; 
 
 function NavBar({ showLogin = true, showCreateEditor = true }) {
     const navigate = useNavigate();
     const { isLoggedIn, logout } = useAuth();
+
     const handleCreateNewEditor = () => {
-        navigate("/editor");
+        navigate(`/editor/${uuidv4()}`);
     };
+
     return (
         <Box
             sx={{
@@ -40,7 +42,6 @@ function NavBar({ showLogin = true, showCreateEditor = true }) {
                     }
                 }}
             >
-
                 <Typography variant="h6">CodeShare</Typography>
             </Button>
 
@@ -81,7 +82,6 @@ function NavBar({ showLogin = true, showCreateEditor = true }) {
                     </Button>
                 )}
             </Box>
-
         </Box>
     )
 }

@@ -2,6 +2,7 @@ import { Button, Box, Typography } from "@mui/material";
 import NavBar from "../components/NavBar";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { v4 as uuidv4 } from "uuid"; // <--- import here
 
 function LandingPage() {
     const navigate = useNavigate();
@@ -27,7 +28,15 @@ function LandingPage() {
             <Typography variant="h6" gutterBottom textAlign="center">
                 A real-time online code editor for teams, classrooms, and interviews.
             </Typography>
-            <Button sx={{ my: 3 }} color='inherit' variant="outlined" size="large" onClick={() => navigate('/editor')}>Share Code Now</Button>
+            <Button
+              sx={{ my: 3 }}
+              color='inherit'
+              variant="outlined"
+              size="large"
+              onClick={() => navigate(`/editor/${uuidv4()}`)}
+            >
+              Share Code Now
+            </Button>
         </Box>
         </>
     );
