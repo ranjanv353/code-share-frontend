@@ -1,9 +1,11 @@
 import { Box, Button, Typography } from "@mui/material";
 import CodeIcon from '@mui/icons-material/Code';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from "../context/AuthContext";
 
 function NavBar({ showLogin = true }) {
     const navigate = useNavigate();
+    const { isLoggedIn } = useAuth();
     return (
         <Box
             sx={{
@@ -31,7 +33,7 @@ function NavBar({ showLogin = true }) {
                 <Typography variant="h6">CodeShare</Typography>
             </Button>
 
-            {showLogin && (
+            {!isLoggedIn && showLogin && (
                 <Button
                     disableRipple
                     disableElevation
