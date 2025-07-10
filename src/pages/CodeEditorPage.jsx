@@ -9,6 +9,9 @@ import {
     FormControl,
     InputLabel,
 } from "@mui/material";
+import Snackbar from "@mui/material/Snackbar";
+import IconButton from "@mui/material/IconButton";
+import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
 import CodeIcon from '@mui/icons-material/Code';
 
@@ -39,13 +42,23 @@ function CodeEditorPage() {
     const handleSave = () => {
         console.log("Code saved:", code);
     };
+    const [snackbarOpen, setSnackbarOpen] = useState(false);
 
+    const handleShare = () => {
+        navigator.clipboard.writeText(window.location.href);
+        setSnackbarOpen(true);
+    };
+
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === "clickaway") return;
+        setSnackbarOpen(false);
+    };
     return (
         <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
             <Box
                 sx={{
                     px: 2,
-                    paddingTop: 2,
+                    paddingTop: 1.2,
                     paddingBottom: 1,
                     borderBottom: "1px solid #333",
                     backgroundColor: "#1e1e1e",
@@ -122,10 +135,42 @@ function CodeEditorPage() {
                         </Select>
                     </FormControl>
 
-                    <Button variant="outlined" color="primary" onClick={handleSave}>
+                    <Button variant="outlined" color="inherit" onClick={handleSave}>
                         Save
                     </Button>
+                    <Button
+                        variant="outlined"
+                        color="inherit"
+                        onClick={handleShare}
+                    >
+                        Share
+                    </Button>
                 </Box>
+                <Snackbar
+                    anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+                    open={snackbarOpen}
+                    autoHideDuration={2000}
+                    onClose={handleSnackbarClose}
+                    message="Link copied to clipboard!"
+                    ContentProps={{
+                        sx: {
+                            backgroundColor: (theme) => theme.palette.primary.main,
+                            color: (theme) => theme.palette.primary.contrastText,
+                            fontFamily: 'inherit', 
+                        }
+                    }}
+                    action={
+                        <IconButton
+                            size="small"
+                            aria-label="close"
+                            color="inherit"
+                            onClick={handleSnackbarClose}
+                            sx={{ fontFamily: 'inherit' }}
+                        >
+                            <CloseIcon fontSize="small" />
+                        </IconButton>
+                    }
+                />
             </Box>
 
             <Box sx={{ flexGrow: 1 }}>

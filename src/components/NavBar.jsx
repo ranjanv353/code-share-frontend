@@ -2,10 +2,14 @@ import { Box, Button, Typography } from "@mui/material";
 import CodeIcon from '@mui/icons-material/Code';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from "../context/AuthContext";
+import { Logout } from "@mui/icons-material";
 
-function NavBar({ showLogin = true }) {
+function NavBar({ showLogin = true, showCreateEditor = true }) {
     const navigate = useNavigate();
-    const { isLoggedIn } = useAuth();
+    const { isLoggedIn, logout } = useAuth();
+    const handleCreateNewEditor = () => {
+        navigate("/editor");
+    };
     return (
         <Box
             sx={{
@@ -28,23 +32,56 @@ function NavBar({ showLogin = true }) {
                 disableRipple
                 disableElevation
                 disableFocusRipple
-                onClick={() => navigate('/')}
+                onClick={() => {
+                    if (isLoggedIn) {
+                        navigate('/dashboard');
+                    } else {
+                        navigate('/');
+                    }
+                }}
             >
+
                 <Typography variant="h6">CodeShare</Typography>
             </Button>
 
-            {!isLoggedIn && showLogin && (
-                <Button
-                    disableRipple
-                    disableElevation
-                    disableFocusRipple
-                    variant="outlined"
-                    color="inherit"
-                    onClick={() => navigate('/auth')}
-                >
-                    Sign In
-                </Button>
-            )}
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                {showCreateEditor && (
+                    <Button
+                        variant="outlined"
+                        color="inherit"
+                        onClick={handleCreateNewEditor}
+                    >
+                        Create New Editor
+                    </Button>
+                )}
+
+                {isLoggedIn && showLogin && (
+                    <Button
+                        disableRipple
+                        disableElevation
+                        disableFocusRipple
+                        variant="outlined"
+                        color="inherit"
+                        onClick={logout}
+                    >   
+                        Sign Out
+                    </Button>
+                )}
+
+                {!isLoggedIn && showLogin && (
+                    <Button
+                        disableRipple
+                        disableElevation
+                        disableFocusRipple
+                        variant="outlined"
+                        color="inherit"
+                        onClick={() => navigate('/auth')}
+                    >
+                        Sign In
+                    </Button>
+                )}
+            </Box>
+
         </Box>
     )
 }

@@ -15,8 +15,8 @@ function App() {
         <Route path="/dashboard" element={ <ProtectedRoute> <DashboardPage /> </ProtectedRoute> }/>
         <Route path="/login" element={<Navigate to="/auth" />} />
         <Route path="/signup" element={<Navigate to="/auth" />} />
-        <Route path="/404" element={<NotFoundPage/>} />
-        <Route path="*" element={<CodeEditorPage />} />
+        <Route path="/editor" element={<CodeEditorPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
   );

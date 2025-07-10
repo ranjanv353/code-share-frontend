@@ -1,9 +1,12 @@
 import { Button, Box, Typography } from "@mui/material";
 import NavBar from "../components/NavBar";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function LandingPage() {
     const navigate = useNavigate();
+    const {isLoggedIn} = useAuth();
+    if (isLoggedIn) return <Navigate to="/dashboard" replace />;
     return (
         <>
         <NavBar/>
@@ -24,7 +27,7 @@ function LandingPage() {
             <Typography variant="h6" gutterBottom textAlign="center">
                 A real-time online code editor for teams, classrooms, and interviews.
             </Typography>
-            <Button sx={{ my: 3 }} color='inherit' variant="outlined" size="large" onClick={() => navigate('/hkjhkjh')}>Share Code Now</Button>
+            <Button sx={{ my: 3 }} color='inherit' variant="outlined" size="large" onClick={() => navigate('/editor')}>Share Code Now</Button>
         </Box>
         </>
     );

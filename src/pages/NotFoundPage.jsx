@@ -5,7 +5,7 @@ import NavBar from "../components/NavBar";
 export default function NotFoundPage() {
     const navigate = useNavigate();
     const handleCreateNewEditor = () => {
-        navigate("/room/new"); 
+        navigate("/editor"); 
     };
 
     return (
