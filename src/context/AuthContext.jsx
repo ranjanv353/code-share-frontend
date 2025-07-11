@@ -27,7 +27,6 @@ export function AuthProvider({ children }) {
   setIsLoggedIn(false);
   setUser(null);
   localStorage.clear(); 
-  console.log("Logged out! Navigating to /");
   navigate('/');
 };
 

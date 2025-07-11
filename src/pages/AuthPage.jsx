@@ -67,7 +67,6 @@ function AuthPage() {
     if (emailError || passwordError) return;
 
     login(email, password);
-    console.log("Logging in or signing up with:", email, password);
   };
   if (isLoggedIn) {
     return <Navigate to="/dashboard" replace />;
