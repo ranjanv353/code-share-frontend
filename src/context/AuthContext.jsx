@@ -1,37 +1,83 @@
-import React, { createContext, useContext, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { AUTH_IS_LOGGED_IN_KEY, AUTH_USER_KEY } from "../constants.js";
+// src/context/AuthContext.jsx
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { Auth } from "aws-amplify";
 
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
 
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem(AUTH_IS_LOGGED_IN_KEY) === "true";
-  });
-  const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem(AUTH_USER_KEY);
-    return stored ? JSON.parse(stored) : null;
-  });
+  useEffect(() => {
+    Auth.currentAuthenticatedUser()
+      .then(user => {
+        setUser(user);
+        setIsLoggedIn(true);
+      })
+      .catch(() => {
+        setUser(null);
+        setIsLoggedIn(false);
+      });
+  }, []);
 
-  const login = (email, password) => {
-    setIsLoggedIn(true);
-    setUser({ email });
-    localStorage.setItem(AUTH_IS_LOGGED_IN_KEY, "true");
-    localStorage.setItem(AUTH_USER_KEY, JSON.stringify({ email }));
-    navigate("/dashboard");
+  const login = async (email, password) => {
+    try {
+      const user = await Auth.signIn(email, password);
+      setUser(user);
+      setIsLoggedIn(true);
+      return user;
+    } catch (error) {
+      throw error;
+    }
   };
 
-  const logout = () => {
-  setIsLoggedIn(false);
-  setUser(null);
-  localStorage.clear(); 
-  navigate('/');
-};
+  const googleSignIn = () => Auth.federatedSignIn({ provider: "Google" });
+
+  const signup = async (email, password, name) => {
+    try {
+      const { user } = await Auth.signUp({
+        username: email,
+        password,
+        attributes: { email, name },
+      });
+      return user;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const confirmSignUp = async (email, code) => {
+    try {
+      await Auth.confirmSignUp(email, code);
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const logout = async () => {
+    await Auth.signOut();
+    setUser(null);
+    setIsLoggedIn(false);
+  };
+
+  const forgotPassword = async (email) => {
+    return Auth.forgotPassword(email);
+  };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        isLoggedIn,
+        user,
+        login,
+        googleSignIn,
+        signup,
+        confirmSignUp,
+        logout,
+        forgotPassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

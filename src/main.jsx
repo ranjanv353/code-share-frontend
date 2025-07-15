@@ -6,7 +6,11 @@ import { BrowserRouter } from 'react-router-dom';
 import theme from './theme.jsx';
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext.jsx';
+import { Amplify} from "aws-amplify";
+import { Auth } from "aws-amplify";   
+import awsConfig from "./aws-exports";
 
+Amplify.configure(awsConfig);
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <CssBaseline />

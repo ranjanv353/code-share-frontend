@@ -90,7 +90,7 @@ useEffect(() => {
         }}
       >
         <Typography variant="h4" fontWeight={600} gutterBottom>
-          Welcome, {user?.email || "User"}!
+          Welcome, {user?.attributes?.name || user?.email || "User"}
         </Typography>
 
         <Box
