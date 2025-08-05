@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import AuthPage from './pages/AuthPage';
 import CodeEditorPage from './pages/CodeEditorPage';
 import NotFoundPage from './pages/NotFoundPage';
-import DashboardPage from './pages/DashboardPage'; // <- check filename casing!
+import DashboardPage from './pages/DashBoardPage'; 
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
