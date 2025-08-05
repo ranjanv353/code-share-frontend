@@ -9,6 +9,7 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { Amplify} from "aws-amplify";
 import { Auth } from "aws-amplify";   
 import awsConfig from "./aws-exports";
+import { ApiProvider } from './context/ApiContext.jsx';
 
 Amplify.configure(awsConfig);
 createRoot(document.getElementById('root')).render(
@@ -16,9 +17,11 @@ createRoot(document.getElementById('root')).render(
     <CssBaseline />
     <ThemeProvider theme={theme}>
       <BrowserRouter>
+      <ApiProvider>
        <AuthProvider>
         <App />
         </AuthProvider>
+        </ApiProvider>
       </BrowserRouter>
     </ThemeProvider>
   </StrictMode>,

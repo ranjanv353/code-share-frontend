@@ -50,7 +50,7 @@ function LandingPage() {
             color="inherit"
             variant="outlined"
             size="large"
-            onClick={() => navigate(`/editor/${uuidv4()}`)}
+          onClick={() =>  navigate("/editor")}
           >
             Share Code Now
           </Button>

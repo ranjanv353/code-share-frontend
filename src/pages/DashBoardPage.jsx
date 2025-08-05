@@ -16,19 +16,13 @@ import { useNavigate } from "react-router-dom";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import ViewListIcon from "@mui/icons-material/ViewList";
-import { getAllEditors, deleteEditor } from "../utils/storage";
 import { keyframes } from "@mui/system";
 import { DASHBOARD_VIEW_MODE } from "../constants";
+import { useApi } from "../context/ApiContext";
 
 const fadeInUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px);}
+  to { opacity: 1; transform: translateY(0);}
 `;
 
 const Editor = lazy(() => import("@monaco-editor/react"));
@@ -36,33 +30,54 @@ const Editor = lazy(() => import("@monaco-editor/react"));
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { listRooms, deleteRoom } = useApi();
+
   const [recentEditors, setRecentEditors] = useState([]);
- const [viewMode, setViewMode] = useState(() => {
-  return localStorage.getItem(DASHBOARD_VIEW_MODE) || "grid";
-});
-
-useEffect(() => {
-  localStorage.setItem(DASHBOARD_VIEW_MODE, viewMode);
-}, [viewMode]);
-
-
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem(DASHBOARD_VIEW_MODE) || "grid";
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const editors = getAllEditors();
-    const emptyEditors = editors.filter(
-      (e) => e.code.trim() === "" && e.name === "Untitled"
-    );
-    emptyEditors.forEach((editor) => deleteEditor(editor.id));
-    const validEditors = editors.filter(
-      (e) => e.code.trim() !== "" || e.name !== "Untitled"
-    );
-    setRecentEditors(validEditors);
-  }, []);
+    localStorage.setItem(DASHBOARD_VIEW_MODE, viewMode);
+  }, [viewMode]);
 
-  const handleDelete = (e, id) => {
+ useEffect(() => {
+  async function fetchRooms() {
+    setLoading(true);
+    setError(null);
+    try {
+      if (!user) {
+        setRecentEditors([]);
+        setLoading(false);
+        return;
+      }
+      const response = await listRooms();
+      const allRooms = [...(response?.owned || []), ...(response?.shared || [])];
+
+      setRecentEditors(allRooms);
+    } catch (err) {
+      console.error("Room fetch error:", err);
+      setError(err.message || "Failed to load rooms.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  fetchRooms();
+}, [user]);
+
+  const handleDelete = async (e, id) => {
     e.stopPropagation();
-    deleteEditor(id);
-    setRecentEditors(getAllEditors());
+    try {
+      setLoading(true);
+      await deleteRoom(id);
+      setRecentEditors((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      setError(err.message || "Failed to delete room.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOpen = (id) => {
@@ -124,7 +139,15 @@ useEffect(() => {
           </ToggleButtonGroup>
         </Box>
 
-        {recentEditors.length === 0 ? (
+        {loading ? (
+          <Box sx={{ mt: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Typography color="error" sx={{ ml: 2, mt: 1 }}>
+            {error}
+          </Typography>
+        ) : recentEditors.length === 0 ? (
           <Typography color="text.secondary" sx={{ ml: 2, mt: 1 }}>
             No recent editors.
           </Typography>
@@ -155,12 +178,9 @@ useEffect(() => {
                     animation: `${fadeInUp} 0.5s ease forwards`,
                     animationDelay: `${index * 100}ms`,
                     opacity: 0,
-                    "&:hover": {
-                      transform: "scale(1.02)",
-                    },
+                    "&:hover": { transform: "scale(1.02)" },
                   }}
                 >
-                
                   <Box
                     sx={{
                       position: "absolute",
@@ -168,35 +188,27 @@ useEffect(() => {
                       right: 8,
                       zIndex: 2,
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(e, room.id);
-                    }}
+                    onClick={(e) => handleDelete(e, room.id)}
                   >
                     <IconButton aria-label="delete" color="error" size="small">
                       <DeleteIcon fontSize="small" />
                     </IconButton>
                   </Box>
-
                   <Box sx={{ flexGrow: 1, minHeight: 0 }}>
-                    <Suspense
-                      fallback={
-                        <Box
-                          sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            height: "100%",
-                          }}
-                        >
-                          <CircularProgress size={24} />
-                        </Box>
-                      }
-                    >
+                    <Suspense fallback={
+                      <Box sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        height: "100%",
+                      }}>
+                        <CircularProgress size={24} />
+                      </Box>
+                    }>
                       <Editor
                         height="100%"
                         defaultLanguage={room.language || "javascript"}
-                        value={room.code.trim() || "// No code yet"}
+                        value={room.content?.trim() || "// No code yet"}
                         theme={room.theme || "vs-dark"}
                         options={{
                           readOnly: true,
@@ -210,7 +222,6 @@ useEffect(() => {
                       />
                     </Suspense>
                   </Box>
-
                   <CardContent
                     sx={{
                       borderTop: 1,
@@ -303,10 +314,7 @@ useEffect(() => {
                     right: 8,
                     zIndex: 2,
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(e, room.id);
-                  }}
+                  onClick={(e) => handleDelete(e, room.id)}
                 >
                   <IconButton aria-label="delete" color="error" size="small">
                     <DeleteIcon fontSize="small" />

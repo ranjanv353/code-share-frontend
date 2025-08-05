@@ -1,4 +1,3 @@
-// src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Auth } from "aws-amplify";
 
@@ -8,15 +7,32 @@ export function AuthProvider({ children }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
 
+  // Helper to save Cognito access token & id token in localStorage
+  const saveTokens = async () => {
+    try {
+      const session = await Auth.currentSession();
+      const accessToken = session.getAccessToken().getJwtToken();
+      const idToken = session.getIdToken().getJwtToken();
+      localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("idToken", idToken);
+    } catch {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("idToken");
+    }
+  };
+
   useEffect(() => {
     Auth.currentAuthenticatedUser()
-      .then(user => {
+      .then(async (user) => {
         setUser(user);
         setIsLoggedIn(true);
+        await saveTokens();
       })
       .catch(() => {
         setUser(null);
         setIsLoggedIn(false);
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("idToken");
       });
   }, []);
 
@@ -25,13 +41,17 @@ export function AuthProvider({ children }) {
       const user = await Auth.signIn(email, password);
       setUser(user);
       setIsLoggedIn(true);
+      await saveTokens();
       return user;
     } catch (error) {
       throw error;
     }
   };
 
-  const googleSignIn = () => Auth.federatedSignIn({ provider: "Google" });
+  const googleSignIn = async () => {
+    await Auth.federatedSignIn({ provider: "Google" });
+    await saveTokens();
+  };
 
   const signup = async (email, password, name) => {
     try {
@@ -59,6 +79,8 @@ export function AuthProvider({ children }) {
     await Auth.signOut();
     setUser(null);
     setIsLoggedIn(false);
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("idToken");
   };
 
   const forgotPassword = async (email) => {
