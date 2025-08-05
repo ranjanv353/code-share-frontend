@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
+import { createSocket } from "../utils/socket";
+
 import { useParams, useNavigate } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import {
@@ -26,11 +28,15 @@ import ShareIcon from "@mui/icons-material/Share";
 import AddIcon from "@mui/icons-material/Add";
 import CodeIcon from "@mui/icons-material/Code";
 import { useApi } from "../context/ApiContext";
-import { useAuth } from "../context/AuthContext"; 
+import { useAuth } from "../context/AuthContext";
 
 function getUserSub(user) {
   if (!user) return null;
-  if (user.signInUserSession && user.signInUserSession.idToken && user.signInUserSession.idToken.payload) {
+  if (
+    user.signInUserSession &&
+    user.signInUserSession.idToken &&
+    user.signInUserSession.idToken.payload
+  ) {
     return user.signInUserSession.idToken.payload.sub;
   }
   if (user.attributes && user.attributes.sub) return user.attributes.sub;
@@ -38,10 +44,28 @@ function getUserSub(user) {
   return null;
 }
 
-
 const supportedLanguages = [
-  "javascript", "python", "java", "typescript", "c#", "cpp", "c", "sql", "go",
-  "php", "rust", "kotlin", "html", "css", "bash", "shell", "swift", "ruby", "dart", "markdown", "json"
+  "javascript",
+  "python",
+  "java",
+  "typescript",
+  "c#",
+  "cpp",
+  "c",
+  "sql",
+  "go",
+  "php",
+  "rust",
+  "kotlin",
+  "html",
+  "css",
+  "bash",
+  "shell",
+  "swift",
+  "ruby",
+  "dart",
+  "markdown",
+  "json",
 ];
 const themes = [
   { label: "Dark", value: "vs-dark" },
@@ -50,19 +74,38 @@ const themes = [
   { label: "High Contrast", value: "hc-black" },
 ];
 const extensionMap = {
-  javascript: "js", python: "py", java: "java", typescript: "ts", "c#": "cs", cpp: "cpp", "c++": "cpp", c: "c",
-  sql: "sql", go: "go", php: "php", rust: "rs", kotlin: "kt", html: "html", css: "css", bash: "sh", shell: "sh",
-  swift: "swift", ruby: "rb", dart: "dart", markdown: "md", json: "json",
+  javascript: "js",
+  python: "py",
+  java: "java",
+  typescript: "ts",
+  "c#": "cs",
+  cpp: "cpp",
+  "c++": "cpp",
+  c: "c",
+  sql: "sql",
+  go: "go",
+  php: "php",
+  rust: "rs",
+  kotlin: "kt",
+  html: "html",
+  css: "css",
+  bash: "sh",
+  shell: "sh",
+  swift: "swift",
+  ruby: "rb",
+  dart: "dart",
+  markdown: "md",
+  json: "json",
 };
-function getExtension(lang) { return extensionMap[lang] || "txt"; }
+function getExtension(lang) {
+  return extensionMap[lang] || "txt";
+}
 
 function CodeEditorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { createRoom, getRoom, updateRoom, shareRoom } = useApi();
   const { user, isLoggedIn } = useAuth();
-  console.log('user:', user);
-  console.log('isLoggedIn:', isLoggedIn);
 
   const [editorId, setEditorId] = useState(id || null);
   const [name, setName] = useState("Untitled");
@@ -70,7 +113,9 @@ function CodeEditorPage() {
   const [language, setLanguage] = useState("");
   const [theme, setTheme] = useState("");
   const [snackbar, setSnackbar] = useState({
-    open: false, message: "", color: "primary"
+    open: false,
+    message: "",
+    color: "primary",
   });
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [openShareDialog, setOpenShareDialog] = useState(false);
@@ -86,6 +131,7 @@ function CodeEditorPage() {
   // Sharing form
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("editor");
+  const socketRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,18 +154,52 @@ function CodeEditorPage() {
             setIsAuthRoom(!!room.owner);
             setMembers(room.members || []);
             const userSub = getUserSub(user);
-            setIsOwner(room.owner && userSub && userSub === room.owner);
+            const isRoomOwner = room.owner && userSub && userSub === room.owner;
+            setIsOwner(isRoomOwner);
+
+            const email =
+              user?.attributes?.email || user?.email || "guest@anon.com";
+            const socket = createSocket(email);
+            socket.connect();
+            socket.emit("join-room", { roomId: room.id });
+
+            socket.on("code-update", ({ code: incomingCode, from }) => {
+              if (from !== email) {
+                setCode(incomingCode);
+              }
+            });
+            socket.on("language-update", ({ language: newLang, from }) => {
+              if (from !== email) {
+                setLanguage(newLang);
+              }
+            });
+
+            socketRef.current = socket;
           }
         }
       } catch (err) {
         if (!cancelled) setError(err.message || "Room not found.");
-        setSnackbar({ open: true, message: err.message || "Room not found.", color: "error" });
+        setSnackbar({
+          open: true,
+          message: err.message || "Room not found.",
+          color: "error",
+        });
       } finally {
         if (!cancelled) setLoading(false);
       }
-      return () => { cancelled = true; }
+      return () => {
+        cancelled = true;
+      };
     }
     loadOrCreateRoom();
+
+    return () => {
+      cancelled = true;
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
   }, [id, navigate, user]);
 
   // Debounced auto-save
@@ -127,19 +207,42 @@ function CodeEditorPage() {
     if (!editorId || loading || !isOwner) return;
     const handler = setTimeout(() => {
       updateRoom(editorId, {
-        name, content: code, language, theme
-      }).catch(err => {});
+        name,
+        content: code,
+        language,
+        theme,
+      }).catch((err) => {});
     }, 1000);
     return () => clearTimeout(handler);
   }, [editorId, name, code, language, theme, loading, isOwner, updateRoom]);
 
-  const canEdit = isOwner || (isAuthRoom && roomType === "public" && !members.length);
+  const canEdit =
+    isOwner || (isAuthRoom && roomType === "public" && !members.length);
 
   const handleEditorChange = (value) => {
-    if (canEdit) setCode(value || "");
+    if (canEdit) {
+      setCode(value || "");
+      if (socketRef.current && editorId) {
+        socketRef.current.emit("code-change", {
+          roomId: editorId,
+          code: value || "",
+        });
+      }
+    }
   };
 
-  const handleLanguageChange = (e) => setLanguage(e.target.value);
+  const handleLanguageChange = (e) => {
+    const newLang = e.target.value;
+    setLanguage(newLang);
+
+    if (socketRef.current && editorId) {
+      socketRef.current.emit("language-change", {
+        roomId: editorId,
+        language: newLang,
+      });
+    }
+  };
+
   const handleThemeChange = (e) => setTheme(e.target.value);
 
   // const handleCopyCode = async () => {
@@ -196,21 +299,25 @@ function CodeEditorPage() {
     setSnackbar({ ...snackbar, open: false });
   };
 
- const handleRoomTypeChange = async (e) => {
-  const newType = e.target.value;
-  try {
-    await updateRoom(editorId, { type: newType });
-    setSnackbar({ open: true, message: `Room is now ${newType}`, color: "success" });
-    const updatedRoom = await getRoom(editorId);
-    setRoomType(updatedRoom.type || "public");
-    setMembers(updatedRoom.members || []);
-    const userSub = getUserSub(user);
-    setIsOwner(updatedRoom.owner && userSub && userSub === updatedRoom.owner);
-    setIsAuthRoom(!!updatedRoom.owner);
-  } catch (err) {
-    setSnackbar({ open: true, message: err.message, color: "error" });
-  }
-};
+  const handleRoomTypeChange = async (e) => {
+    const newType = e.target.value;
+    try {
+      await updateRoom(editorId, { type: newType });
+      setSnackbar({
+        open: true,
+        message: `Room is now ${newType}`,
+        color: "success",
+      });
+      const updatedRoom = await getRoom(editorId);
+      setRoomType(updatedRoom.type || "public");
+      setMembers(updatedRoom.members || []);
+      const userSub = getUserSub(user);
+      setIsOwner(updatedRoom.owner && userSub && userSub === updatedRoom.owner);
+      setIsAuthRoom(!!updatedRoom.owner);
+    } catch (err) {
+      setSnackbar({ open: true, message: err.message, color: "error" });
+    }
+  };
 
   const reloadMembers = async () => {
     if (!editorId) return;
@@ -227,7 +334,11 @@ function CodeEditorPage() {
       setInviteEmail("");
       setInviteRole("editor");
       reloadMembers();
-      setSnackbar({ open: true, message: "Collaborator invited!", color: "success" });
+      setSnackbar({
+        open: true,
+        message: "Collaborator invited!",
+        color: "success",
+      });
     } catch (err) {
       setSnackbar({ open: true, message: err.message, color: "error" });
     }
@@ -247,36 +358,60 @@ function CodeEditorPage() {
     try {
       await shareRoom(editorId, { userId: email, role: "remove" });
       reloadMembers();
-      setSnackbar({ open: true, message: "Collaborator removed!", color: "success" });
+      setSnackbar({
+        open: true,
+        message: "Collaborator removed!",
+        color: "success",
+      });
     } catch (err) {
       setSnackbar({ open: true, message: err.message, color: "error" });
     }
   };
 
   if (loading) return null;
-  if (error) return (
-    <Box sx={{ p: 6, textAlign: "center" }}>
-      <Typography color="error" variant="h5" gutterBottom>
-        {error}
-      </Typography>
-      <Button variant="contained" color="primary" onClick={() => navigate("/")}>
-        Go Home
-      </Button>
-    </Box>
-  );
+  if (error)
+    return (
+      <Box sx={{ p: 6, textAlign: "center" }}>
+        <Typography color="error" variant="h5" gutterBottom>
+          {error}
+        </Typography>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => navigate("/")}
+        >
+          Go Home
+        </Button>
+      </Box>
+    );
 
   return (
     <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
       <Box
         sx={{
-          px: 2, pt: 1.2, pb: 1, borderBottom: "1px solid #333", backgroundColor: "#1e1e1e", color: "#fff",
-          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 1,
+          px: 2,
+          pt: 1.2,
+          pb: 1,
+          borderBottom: "1px solid #333",
+          backgroundColor: "#1e1e1e",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 1,
         }}
       >
         <Button
           startIcon={<CodeIcon />}
-          sx={{ color: "inherit", textTransform: "none", background: "transparent" }}
-          disableRipple disableElevation disableFocusRipple
+          sx={{
+            color: "inherit",
+            textTransform: "none",
+            background: "transparent",
+          }}
+          disableRipple
+          disableElevation
+          disableFocusRipple
           onClick={() => navigate("/")}
         >
           <Typography variant="h6" noWrap>
@@ -289,7 +424,9 @@ function CodeEditorPage() {
           onChange={(e) => setName(e.target.value)}
           placeholder="Untitled"
           sx={{
-            minWidth: 150, maxWidth: 300, flexGrow: 1,
+            minWidth: 150,
+            maxWidth: 300,
+            flexGrow: 1,
             input: { color: "#fff" },
             "& .MuiOutlinedInput-root": {
               "& fieldset": { borderColor: "#555" },
@@ -309,7 +446,9 @@ function CodeEditorPage() {
               sx={{
                 color: "#fff",
                 ".MuiOutlinedInput-notchedOutline": { borderColor: "#555" },
-                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#888" },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#888",
+                },
                 ".MuiSvgIcon-root": { color: "#fff" },
               }}
             >
@@ -321,8 +460,14 @@ function CodeEditorPage() {
 
         <Box
           sx={{
-            display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap",
-            justifyContent: "flex-end", flexGrow: 0, mt: { xs: 1, sm: 0 }, width: { xs: "100%", sm: "auto" },
+            display: "flex",
+            gap: 2,
+            alignItems: "center",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+            flexGrow: 0,
+            mt: { xs: 1, sm: 0 },
+            width: { xs: "100%", sm: "auto" },
           }}
         >
           <Tooltip title="New Editor (clear)">
@@ -331,7 +476,9 @@ function CodeEditorPage() {
               color="warning"
               startIcon={<AddIcon />}
               onClick={handleNewEditor}
-            >New</Button>
+            >
+              New
+            </Button>
           </Tooltip>
           <Tooltip title="Copy room link">
             <Button
@@ -357,7 +504,12 @@ function CodeEditorPage() {
             </Tooltip>
           )}
           <Tooltip title="Download Code">
-            <Button variant="outlined" color="inherit" startIcon={<DownloadIcon />} onClick={handleDownload}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<DownloadIcon />}
+              onClick={handleDownload}
+            >
               Download
             </Button>
           </Tooltip>
@@ -370,12 +522,16 @@ function CodeEditorPage() {
               sx={{
                 color: "#fff",
                 ".MuiOutlinedInput-notchedOutline": { borderColor: "#555" },
-                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#888" },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#888",
+                },
                 ".MuiSvgIcon-root": { color: "#fff" },
               }}
             >
               {supportedLanguages.map((lang) => (
-                <MenuItem key={lang} value={lang}>{lang}</MenuItem>
+                <MenuItem key={lang} value={lang}>
+                  {lang}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -388,12 +544,16 @@ function CodeEditorPage() {
               sx={{
                 color: "#fff",
                 ".MuiOutlinedInput-notchedOutline": { borderColor: "#555" },
-                "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#888" },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "#888",
+                },
                 ".MuiSvgIcon-root": { color: "#fff" },
               }}
             >
               {themes.map((t) => (
-                <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>
+                <MenuItem key={t.value} value={t.value}>
+                  {t.label}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
@@ -429,24 +589,44 @@ function CodeEditorPage() {
           }
         />
 
-        <Dialog open={openShareDialog} onClose={() => setOpenShareDialog(false)} maxWidth="xs" fullWidth>
+        <Dialog
+          open={openShareDialog}
+          onClose={() => setOpenShareDialog(false)}
+          maxWidth="xs"
+          fullWidth
+        >
           <DialogTitle>Manage Access</DialogTitle>
           <DialogContent>
             <Typography sx={{ mt: 1 }}>Collaborators:</Typography>
             <Box sx={{ my: 1 }}>
-              {members.map(m => (
-                <Box key={m.email} sx={{ display: "flex", alignItems: "center", mb: 0.5 }}>
+              {members.map((m) => (
+                <Box
+                  key={m.email}
+                  sx={{ display: "flex", alignItems: "center", mb: 0.5 }}
+                >
                   <Typography sx={{ mr: 2 }}>{m.email}</Typography>
-                  <Typography sx={{ mr: 2, fontWeight: m.role === "owner" ? "bold" : "normal" }}>
+                  <Typography
+                    sx={{
+                      mr: 2,
+                      fontWeight: m.role === "owner" ? "bold" : "normal",
+                    }}
+                  >
                     {m.role}
                   </Typography>
                   {m.role !== "owner" && (
                     <>
-                      <Button size="small" onClick={() => handleRemoveCollaborator(m.email)}>Remove</Button>
+                      <Button
+                        size="small"
+                        onClick={() => handleRemoveCollaborator(m.email)}
+                      >
+                        Remove
+                      </Button>
                       <Select
                         value={m.role}
                         size="small"
-                        onChange={e => handleChangeRole(m.email, e.target.value)}
+                        onChange={(e) =>
+                          handleChangeRole(m.email, e.target.value)
+                        }
                         sx={{ ml: 1, minWidth: 90 }}
                       >
                         <MenuItem value="editor">Editor</MenuItem>
@@ -461,13 +641,13 @@ function CodeEditorPage() {
               <TextField
                 label="Email"
                 value={inviteEmail}
-                onChange={e => setInviteEmail(e.target.value)}
+                onChange={(e) => setInviteEmail(e.target.value)}
                 size="small"
                 sx={{ mr: 2 }}
               />
               <Select
                 value={inviteRole}
-                onChange={e => setInviteRole(e.target.value)}
+                onChange={(e) => setInviteRole(e.target.value)}
                 size="small"
                 sx={{ mr: 2, minWidth: 90 }}
               >
@@ -488,7 +668,7 @@ function CodeEditorPage() {
             <Button onClick={() => setOpenShareDialog(false)}>Close</Button>
           </DialogActions>
         </Dialog>
-      
+
         <Dialog
           open={openConfirmDialog}
           onClose={() => setOpenConfirmDialog(false)}
@@ -496,14 +676,19 @@ function CodeEditorPage() {
           <DialogTitle>Start New Editor?</DialogTitle>
           <DialogContent>
             <DialogContentText>
-              This will take you to a blank new editor. Your current changes are already saved. Continue?
+              This will take you to a blank new editor. Your current changes are
+              already saved. Continue?
             </DialogContentText>
           </DialogContent>
           <DialogActions>
             <Button onClick={() => setOpenConfirmDialog(false)} color="primary">
               Cancel
             </Button>
-            <Button onClick={createNewEditor} color="warning" variant="contained">
+            <Button
+              onClick={createNewEditor}
+              color="warning"
+              variant="contained"
+            >
               New
             </Button>
           </DialogActions>
